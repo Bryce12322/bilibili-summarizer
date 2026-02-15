@@ -89,8 +89,8 @@ export async function pollTranscription(
   taskId: string,
   onProgress?: (message: string) => void
 ): Promise<string> {
-  const maxAttempts = 60; // 最多轮询 60 次
-  const interval = 3_000; // 每 3 秒轮询一次 → 最长等待 180 秒
+  const maxAttempts = 90; // 最多轮询 90 次
+  const interval = 3_000; // 每 3 秒轮询一次 → 最长等待 270 秒
 
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, interval));
@@ -135,7 +135,7 @@ export async function pollTranscription(
     }
   }
 
-  throw new Error("语音识别超时（超过 180 秒），请尝试更短的视频");
+  throw new Error("语音识别超时（超过 270 秒），请尝试更短的视频");
 }
 
 // ---------------------------------------------------------------------------

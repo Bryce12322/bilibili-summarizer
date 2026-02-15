@@ -241,7 +241,7 @@ export default function Home() {
                 )}
               </div>
               <p className="mt-2 text-xs text-gray-400">
-                仅支持公开的 Bilibili 视频，时长不超过 30 分钟
+                仅支持公开的 Bilibili 视频，时长不超过 60 分钟
               </p>
             </div>
           </div>

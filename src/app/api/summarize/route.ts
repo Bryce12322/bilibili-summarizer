@@ -28,7 +28,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 // Vercel Serverless 最大执行时间（秒）
 // Hobby: 最大 60s | Pro: 最大 300s
-export const maxDuration = 180;
+export const maxDuration = 300;
 
 // ---------------------------------------------------------------------------
 // SSE 流工具
@@ -153,10 +153,10 @@ async function processVideo(
     });
 
     // ---- 时长校验 ----
-    if (info.duration > 30 * 60) {
+    if (info.duration > 60 * 60) {
       send({
         step: "error",
-        message: `视频时长 ${durationMin} 分钟，超过 MVP 阶段 30 分钟上限。请选择更短的视频。`,
+        message: `视频时长 ${durationMin} 分钟，超过 60 分钟上限。请选择更短的视频。`,
       });
       close();
       return;
