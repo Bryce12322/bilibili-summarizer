@@ -225,7 +225,10 @@ export async function getAudioUrl(
 
 /**
  * 下载音频文件到 Buffer
- * Whisper API 文件大小限制为 25MB
+ *
+ * 使用 Bilibili 特定的请求头（Referer 等）下载音频，
+ * 因为 CDN 会拒绝不带 Referer 的请求。
+ * DashScope 文件上传限制为 1GB，这里限制 200MB 已足够 60 分钟视频。
  */
 export async function downloadAudio(audioUrl: string): Promise<Buffer> {
   const res = await fetch(audioUrl, {
@@ -243,9 +246,9 @@ export async function downloadAudio(audioUrl: string): Promise<Buffer> {
   const buffer = Buffer.from(arrayBuffer);
 
   const sizeMB = buffer.length / (1024 * 1024);
-  if (sizeMB > 25) {
+  if (sizeMB > 200) {
     throw new Error(
-      `音频文件过大（${sizeMB.toFixed(1)} MB），超过 25MB 限制，请尝试更短的视频`
+      `音频文件过大（${sizeMB.toFixed(1)} MB），超过 200MB 限制，请尝试更短的视频`
     );
   }
 
