@@ -23,7 +23,6 @@ import {
   submitTranscription,
   pollTranscription,
 } from "@/lib/transcribe";
-import { signAudioToken } from "@/app/api/audio-proxy/route";
 import { summarizeTranscript } from "@/lib/summarize";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -99,8 +98,7 @@ export async function POST(request: NextRequest) {
   const { stream, send, close } = createSSEStream();
 
   // 不 await — 让处理在后台进行，流持续推送
-  const origin = new URL(request.url).origin;
-  void processVideo(inputUrl, origin, send, close);
+  void processVideo(inputUrl, send, close);
 
   return new Response(stream, {
     headers: {
@@ -118,7 +116,6 @@ export async function POST(request: NextRequest) {
 
 async function processVideo(
   inputUrl: string,
-  origin: string,
   send: (payload: Record<string, unknown>) => void,
   close: () => void
 ) {
@@ -196,16 +193,12 @@ async function processVideo(
 
       const audioUrl = await getAudioUrl(bvid, info.cid);
 
-      // 生成带签名的音频代理 URL，绕过 B站 CDN 防盗链
-      const token = signAudioToken(audioUrl);
-      const proxyUrl = `${origin}/api/audio-proxy?token=${encodeURIComponent(token)}`;
-
       send({
         step: "transcribe_submit",
         message: "正在提交语音识别任务（百炼 Paraformer）...",
       });
 
-      const taskId = await submitTranscription(proxyUrl);
+      const taskId = await submitTranscription(audioUrl);
 
       send({
         step: "transcribe_poll",
