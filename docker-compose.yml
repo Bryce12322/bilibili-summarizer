@@ -1,0 +1,11 @@
+services:
+  bilibili-summarizer:
+    build: .
+    container_name: bilibili-summarizer
+    ports:
+      - "3000:3000"
+    environment:
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+    env_file:
+      - .env.local
+    restart: unless-stopped

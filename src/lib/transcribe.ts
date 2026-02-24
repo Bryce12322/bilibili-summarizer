@@ -31,30 +31,74 @@ function getApiKey(): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * B站请求必需的请求头（防止防盗链 403）
+ */
+const BILIBILI_HEADERS: Record<string, string> = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Referer: "https://www.bilibili.com",
+  Accept: "*/*",
+};
+
+/**
  * 向 DashScope 提交文件转写任务
+ *
+ * 策略：预下载音频后上传（推荐）
+ * 1. 从 B站 CDN 下载音频（携带 Referer 头，解决防盗链）
+ * 2. 直接上传音频文件给 Paraformer
+ *
+ * 优势：
+ * - 不需要 Paraformer 访问我们的服务器（适合本地测试）
+ * - 完全控制下载过程
+ * - 可以在本地环境测试
  *
  * @param audioUrl - 音频文件的公开可访问 URL（如 Bilibili CDN 地址）
  * @returns 任务 ID
  */
 export async function submitTranscription(audioUrl: string): Promise<string> {
+  console.log(`[Transcribe] Downloading audio from B站 CDN: ${audioUrl.substring(0, 100)}...`);
+
+  // 1. 从 B站 CDN 下载音频（携带 Referer 头）
+  const audioResponse = await fetch(audioUrl, {
+    headers: BILIBILI_HEADERS,
+  });
+
+  if (!audioResponse.ok) {
+    throw new Error(
+      `从 B站 CDN 下载音频失败 (HTTP ${audioResponse.status}): ${audioResponse.statusText}`
+    );
+  }
+
+  // 检查音频大小
+  const contentLength = audioResponse.headers.get("content-length");
+  if (contentLength) {
+    const sizeMB = parseInt(contentLength) / 1024 / 1024;
+    console.log(`[Transcribe] Audio size: ${sizeMB.toFixed(2)}MB`);
+
+    // 最大 200MB（支持 60 分钟视频）
+    if (sizeMB > 200) {
+      throw new Error(`音频文件过大: ${sizeMB.toFixed(2)}MB (最大 200MB)`);
+    }
+  }
+
+  const audioBlob = await audioResponse.blob();
+  console.log(`[Transcribe] Downloaded ${audioBlob.size} bytes, uploading to Paraformer...`);
+
+  // 2. 上传音频文件到 Paraformer
+  const formData = new FormData();
+  formData.append("model", "paraformer-v2");
+  formData.append("file", audioBlob, "audio.m4s");
+  formData.append("language_hints", "zh");
+
   const res = await fetch(
     `${DASHSCOPE_BASE}/services/audio/asr/transcription`,
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${getApiKey()}`,
-        "Content-Type": "application/json",
         "X-DashScope-Async": "enable",
       },
-      body: JSON.stringify({
-        model: "paraformer-v2",
-        input: {
-          file_urls: [audioUrl],
-        },
-        parameters: {
-          language_hints: ["zh"],
-        },
-      }),
+      body: formData,
     }
   );
 
@@ -66,6 +110,7 @@ export async function submitTranscription(audioUrl: string): Promise<string> {
   const data = await res.json();
 
   if (data.output?.task_id) {
+    console.log(`[Transcribe] Task submitted successfully: ${data.output.task_id}`);
     return data.output.task_id;
   }
 

@@ -25,6 +25,7 @@ import {
 } from "@/lib/transcribe";
 import { summarizeTranscript } from "@/lib/summarize";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { generateAudioProxyToken } from "@/lib/audio-proxy-token";
 
 // Vercel Serverless 最大执行时间（秒）
 // Hobby: 最大 60s | Pro: 最大 300s
@@ -97,8 +98,14 @@ export async function POST(request: NextRequest) {
   // ---- 创建 SSE 流 & 异步处理 ----
   const { stream, send, close } = createSSEStream();
 
+  // 计算当前请求的 origin（用于构建音频代理 URL）
+  const proto =
+    request.headers.get("x-forwarded-proto") || request.headers.get("x-forwarded-protocol") || "https";
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
+  const origin = host ? `${proto}://${host}` : process.env.AUDIO_PROXY_HOST || "";
+
   // 不 await — 让处理在后台进行，流持续推送
-  void processVideo(inputUrl, send, close);
+  void processVideo(inputUrl, send, close, origin);
 
   return new Response(stream, {
     headers: {
@@ -117,7 +124,8 @@ export async function POST(request: NextRequest) {
 async function processVideo(
   inputUrl: string,
   send: (payload: Record<string, unknown>) => void,
-  close: () => void
+  close: () => void,
+  origin: string
 ) {
   try {
     // ---- Step 1: 解析 URL ----
@@ -193,12 +201,26 @@ async function processVideo(
 
       const audioUrl = await getAudioUrl(bvid, info.cid);
 
+      // 为上游音频生成短期签名，并使用本服务作为代理，避免对方无法直接访问原始 CDN（引发 403）
+      let proxyAudioUrl = audioUrl;
+      try {
+        const token = generateAudioProxyToken(audioUrl, 300);
+        if (origin) {
+          proxyAudioUrl = `${origin}/api/audio/proxy?url=${encodeURIComponent(
+            audioUrl
+          )}&token=${encodeURIComponent(token)}`;
+        }
+      } catch (e) {
+        // 如果生成 token 或 origin 构建失败，回退为原始 audioUrl
+        proxyAudioUrl = audioUrl;
+      }
+
       send({
         step: "transcribe_submit",
         message: "正在提交语音识别任务（百炼 Paraformer）...",
       });
 
-      const taskId = await submitTranscription(audioUrl);
+      const taskId = await submitTranscription(proxyAudioUrl);
 
       send({
         step: "transcribe_poll",
