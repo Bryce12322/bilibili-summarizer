@@ -72,7 +72,9 @@ async function diagnose(url: string) {
     if (playData.code === 0 && playData.data?.dash?.audio) {
       const audios = playData.data.dash.audio.sort((a: any, b: any) => a.bandwidth - b.bandwidth);
       audioUrl = audios[0].baseUrl || audios[0].base_url;
-      console.log(`✅ 音频 URL (playurl API): ${audioUrl.substring(0, 100)}...`);
+      if (audioUrl) {
+        console.log(`✅ 音频 URL (playurl API): ${audioUrl.substring(0, 100)}...`);
+      }
     }
   }
 
@@ -89,7 +91,9 @@ async function diagnose(url: string) {
       if (playInfo.data?.dash?.audio) {
         const audios = playInfo.data.dash.audio.sort((a: any, b: any) => a.bandwidth - b.bandwidth);
         audioUrl = audios[0].baseUrl || audios[0].base_url;
-        console.log(`✅ 音频 URL (页面 HTML): ${audioUrl.substring(0, 100)}...`);
+        if (audioUrl) {
+          console.log(`✅ 音频 URL (页面 HTML): ${audioUrl.substring(0, 100)}...`);
+        }
       }
     }
   }
